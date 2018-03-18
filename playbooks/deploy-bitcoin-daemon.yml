@@ -1,0 +1,7 @@
+---
+- name: "Configure app server(s)"
+  hosts: lightning
+  become: True
+
+  roles:
+    - lightning

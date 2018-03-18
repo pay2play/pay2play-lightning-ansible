@@ -1,0 +1,76 @@
+---
+# Basic provisioning example
+- name: Create AWS resources
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  vars:
+    instance_type: "t2.small"
+
+  tasks:
+  - name: Create a security group
+    ec2_group:
+      name: ansible
+      description: "Ansible Security Group"
+      vpc_id: "{{vpc_id}}"
+      region: "{{aws_region}}"
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+      rules:
+        - proto: all
+          cidr_ip: "{{my_local_cidr_ip}}"
+        - proto: all
+          group_name: ansible
+      rules_egress:
+        - proto: all
+          cidr_ip: 0.0.0.0/0
+    register: firewall
+
+  - name: Create an EC2 instance
+    ec2:
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+      key_name: "{{key_name}}"
+      region: "{{aws_region}}"
+      group_id: "{{firewall.group_id}}"
+      instance_type: "{{instance_type}}"
+      image: "{{ami_id}}"
+      wait: yes
+      volumes:
+        - device_name: /dev/sda1
+          volume_type: gp2
+          volume_size: 256
+          delete_on_termination: true
+      exact_count: 1
+      count_tag:
+         Name: lightning-node
+      instance_tags:
+         Name: lightning-node
+    register: ec2
+  - debug: var=ec2
+
+  - name: Allocating elastic IP to instance
+    ec2_eip:
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+      in_vpc: yes
+      reuse_existing_ip_allowed: yes
+      state: present
+      region: "{{aws_region}}"
+      device_id: "{{ ec2.instance_ids[0] }}"
+    register: instance_eip
+  - debug: var=instance_eip.public_ip
+
+  # - name: Wait for SSH to start
+  #   wait_for:
+  #     host: "{{ ec2.instances[0].private_ip }}"
+  #     port: 22
+  #     timeout: 300
+  #     sudo: false
+  #   delegate_to: "127.0.0.1"
+
+  # - name: Add the machine to the inventory
+  #   add_host:
+  #     hostname: "{{ ec2.instances[0].private_ip }}"
+  #     groupname: web_demo
+  #     test: 100

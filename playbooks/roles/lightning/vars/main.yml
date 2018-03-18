@@ -1,0 +1,3 @@
+---
+staging_path: '/srv/lightning'
+bitcoind_path: '/scratch/bitcoin/mainnet/bitcoind'

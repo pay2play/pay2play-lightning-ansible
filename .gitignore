@@ -1,0 +1,12 @@
+playbooks/group_vars/all.yml
+*.retry
+_/
+
+.DS_Store
+*/**.DS_Store
+._*
+.*.sw*
+*~
+.idea/
+.vscode/
+*.retry

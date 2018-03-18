@@ -1,0 +1,89 @@
+---
+- name: Upgrade system
+  apt: upgrade=dist update_cache=yes
+  become: yes
+  tags: provisioning
+
+- name: Install ncdu
+  apt:
+    pkg: ncdu
+    state: installed
+    update_cache: yes
+  become: yes
+  tags: provisioning
+
+- name: Mkdir staging dir
+  file:
+    path: "{{ staging_path }}"
+    state: directory
+    owner: ubuntu
+  become: true
+  tags: deployment
+
+- name: add github ssh key
+  copy: >
+    src=~/.ssh/id_rsa.github
+    dest=/root/.ssh/id_rsa.github
+    owner=root
+    group=root
+    mode=0600
+  become: yes
+
+- name: add github ssh key
+  copy: >
+    src=~/.ssh/id_rsa.github.pub
+    dest=/root/.ssh/id_rsa.github.pub
+    owner=root
+    group=root
+    mode=0600
+  become: yes
+
+- name: configure ssh to use ansible key for github.com
+  template: >
+    src=templates/ssh_config.j2
+    dest=/root/.ssh/config
+    owner=root
+    group=root
+    mode=0644
+  become: yes
+
+- name: Add and load private key to ssh-agent
+  shell: "eval `ssh-agent -s` && ssh-add /root/.ssh/id_rsa.github"
+  become: yes
+
+- name: Set authorized key took from file
+  authorized_key:
+    user: root
+    state: present
+    key: "{{ lookup('file', '~/.ssh/id_rsa.github.pub') }}"
+  become: yes
+
+- name: clone a private repository
+  git: >
+    repo=git@github.com:pay2play/lightning-node.git
+    key_file=/root/.ssh/id_rsa.github
+    dest={{ staging_path }}
+    update=yes
+  become: yes
+
+- name: Run docker
+  command: "docker build . -t bitcoind"
+  args:
+    chdir: "{{ staging_path }}/"
+  become: yes
+  tags: deployment
+
+- name: Mkdir staging dir
+  file:
+    path: "{{ bitcoind_path }}"
+    state: directory
+    owner: ubuntu
+  become: true
+  tags: deployment
+
+- name: Run docker
+  command: "docker run --name bitcoind_mainnet -d -v {{ bitcoind_path }}:/data -p 8333:8333 -p 9735:9735 bitcoind"
+  args:
+    chdir: "{{ staging_path }}/"
+  become: yes
+  tags: deployment
